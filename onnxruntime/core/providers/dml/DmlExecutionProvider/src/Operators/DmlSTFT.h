@@ -16,12 +16,20 @@ private:
 public:
     GpuSTFTOperator(IMLOperatorKernelCreationContext* context)
     {
-        // TODO: no need for extra indirection; just pass ID3D12GraphicsCommandList
         ComPtr<IUnknown> executionObject;
         context->GetExecutionInterface(executionObject.GetAddressOf());
 
+        ComPtr<IMLOperatorKernelCreationContextNodeWrapperPrivate> contextPrivateNodeWrapper;
+        context->QueryInterface(IID_PPV_ARGS(&contextPrivateNodeWrapper));
+
+        ComPtr<IUnknown> dmlProviderI;
+        ORT_THROW_IF_FAILED(contextPrivateNodeWrapper->GetExecutionProvider(dmlProviderI.GetAddressOf()));
+
         ComPtr<ID3D12GraphicsCommandList> commandList;
         ORT_THROW_IF_FAILED(executionObject.As(&commandList));
+
+        ComPtr<Dml::IExecutionProvider> dmlProvider;
+        dmlProviderI.As(&dmlProvider);
 
         ORT_THROW_IF_FAILED(commandList->GetDevice(IID_ID3D12Device, &m_device));
 

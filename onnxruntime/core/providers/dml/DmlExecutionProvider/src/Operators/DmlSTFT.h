@@ -49,6 +49,9 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
     {
         try
         {
+            ComPtr<IMLOperatorShapeInferenceContextPrivate> contextPrivate;
+            ORT_THROW_IF_FAILED(context->QueryInterface(IID_PPV_ARGS(&contextPrivate)));
+
             int64_t isOnesidedInt;
             ORT_THROW_IF_FAILED(context->GetAttribute("onesided", MLOperatorAttributeType::Int, 1, sizeof(int64_t), reinterpret_cast<void*>(&isOnesidedInt)));
 
@@ -62,64 +65,50 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
                 throw;
             }
 
-            std::vector<uint32_t> inputDims(rank);
-            ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, 3, inputDims.data()));
+            // input 0: signal
+            uint32_t batchSize = 0;
+            uint32_t signalLength = 0;
+            {
+                std::vector<uint32_t> inputDims(rank);
+                ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, 4, inputDims.data()));
+                batchSize = inputDims[0];
+                signalLength = inputDims[1];
+            }
 
-            std::vector<uint32_t> frameStepDims(rank);
-            ORT_THROW_IF_FAILED(context->GetInputTensorShape(1, 1, inputDims.data()));
+            // input 1: frame_step (required; constant)
+            uint32_t frameStep = 0;
+            {
+                ComPtr<IMLOperatorTensor> frameStepTensorInterface;
+                ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &frameStepTensorInterface));
+                MLOperatorTensor frameStepTensor(frameStepTensorInterface.Get());
+                const uint32_t frameStep = onnxruntime::narrow<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(frameStepTensor));
+            }
 
-            uint32_t batchSize = inputDims[0];
-            uint32_t signalLength = inputDims[1];
+            // input 2: window (optional)
+            uint32_t windowLength = 0;
+            if (context->IsInputValid(2))
+            {
+                ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, 1, &windowLength));
+            }
 
-            std::array<uint32_t, 3> outputDims = {1,1,1};
+            // input 3: frame_length (optional; constant)
+            uint32_t frameLength = 0;
+            if (context->IsInputValid(3))
+            {
+                ComPtr<IMLOperatorTensor> frameLengthTensorInterface;
+                ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &frameLengthTensorInterface));
+                MLOperatorTensor frameLengthTensor(frameLengthTensorInterface.Get());
+                frameLength = onnxruntime::narrow<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(frameLengthTensor));
+            }
 
-            // // frame_step
-            // if (context->IsInputValid(1))
-            // {
-            //     ComPtr<IMLOperatorShapeInferenceContextPrivate> contextPrivate;
-            //     ORT_THROW_IF_FAILED(context->QueryInterface(IID_PPV_ARGS(&contextPrivate)));
+            // Frame/window lengths represent the same quantity, so use whichever is set (non-zero).
+            windowLength = std::max(windowLength, frameLength);
+            frameLength = std::max(windowLength, frameLength);
 
-            //     ComPtr<IMLOperatorTensor> dftLengthTensor;
-            //     ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &dftLengthTensor));
+            const uint32_t frameCount = (signalLength - windowLength) / frameStep + 1;
+            const uint32_t uniqueBins = isOnesided ? frameLength / 2 + 1 : frameLength;
 
-            //     MLOperatorTensor tensor(dftLengthTensor.Get());
-            //     auto dftLength = gsl::narrow_cast<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(tensor));
-            //     outputDims[axisIdx] = dftLength;
-            // }
-
-            // // outputDims = [batch, frames, frameLength/2+1, 2] if onesided == 1
-            // // else         [batch, frames, frameLength, 2]
-
-            // auto outputDims = inputDims;
-            // // The last dimension of the output shape is always 2.
-            // // It corresponds to the real and imaginary parts of the DFT output.
-            // outputDims.back() = 2;
-
-            // if (context->IsInputValid(1))
-            // {
-            //     // If dft_length is specified, then we should honor the shape.
-            //     // If onesided this will be adjusted later on.
-            //     ComPtr<IMLOperatorShapeInferenceContextPrivate> contextPrivate;
-            //     ORT_THROW_IF_FAILED(context->QueryInterface(IID_PPV_ARGS(&contextPrivate)));
-            //     ComPtr<IMLOperatorTensor> dftLengthTensor;
-            //     ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &dftLengthTensor));
-            //     MLOperatorTensor tensor(dftLengthTensor.Get());
-            //     auto dftLength = gsl::narrow_cast<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(tensor));
-            //     outputDims[axisIdx] = dftLength;
-            // }
-
-            // // When DFT is onesided, the output shape is half the size of the input shape
-            // // along the specified axis.
-            // if (isOnesided)
-            // {
-            //     auto axisDimension = outputDims.at(axisIdx);
-            //     // We need to update the output shape dimension along the specified axis,
-            //     // but sometimes the dimension will be a free dimension or be otherwise unset.
-            //     // Only perform inference when a input dimension value exists.
-            //     auto originalSignalSize = axisDimension;
-            //     auto halfSignalSize = (originalSignalSize >> 1) + 1;
-            //     outputDims.at(axisIdx) = halfSignalSize;
-            // }
+            std::array<uint32_t, 4> outputDims = { batchSize, frameCount, uniqueBins, 2 };
 
             ORT_THROW_IF_FAILED(context->SetOutputTensorShape(0, rank, outputDims.data()));
         }

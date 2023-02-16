@@ -57,20 +57,16 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
 
             bool isOnesided = static_cast<bool>(isOnesidedInt);
 
-            uint32_t rank;
-            ORT_THROW_IF_FAILED(context->GetInputTensorDimensionCount(0, &rank));
-            if (rank == 0)
-            {
-                // If no shape is available for the input, skip shape inference...
-                throw;
-            }
-
             // input 0: signal
             uint32_t batchSize = 0;
             uint32_t signalLength = 0;
             {
+                uint32_t rank;
+                ORT_THROW_IF_FAILED(context->GetInputTensorDimensionCount(0, &rank));
+                if (rank == 0) { return E_FAIL; }
+
                 std::vector<uint32_t> inputDims(rank);
-                ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, 4, inputDims.data()));
+                ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, rank, inputDims.data()));
                 batchSize = inputDims[0];
                 signalLength = inputDims[1];
             }
@@ -81,14 +77,18 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
                 ComPtr<IMLOperatorTensor> frameStepTensorInterface;
                 ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &frameStepTensorInterface));
                 MLOperatorTensor frameStepTensor(frameStepTensorInterface.Get());
-                const uint32_t frameStep = onnxruntime::narrow<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(frameStepTensor));
+                frameStep = onnxruntime::narrow<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(frameStepTensor));
             }
 
             // input 2: window (optional)
             uint32_t windowLength = 0;
             if (context->IsInputValid(2))
             {
-                ORT_THROW_IF_FAILED(context->GetInputTensorShape(0, 1, &windowLength));
+                uint32_t rank;
+                ORT_THROW_IF_FAILED(context->GetInputTensorDimensionCount(2, &rank));
+                if (rank != 1) { return E_FAIL; }
+
+                ORT_THROW_IF_FAILED(context->GetInputTensorShape(2, rank, &windowLength));
             }
 
             // input 3: frame_length (optional; constant)
@@ -96,7 +96,7 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
             if (context->IsInputValid(3))
             {
                 ComPtr<IMLOperatorTensor> frameLengthTensorInterface;
-                ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(1, &frameLengthTensorInterface));
+                ORT_THROW_IF_FAILED(contextPrivate->GetConstantInputTensor(3, &frameLengthTensorInterface));
                 MLOperatorTensor frameLengthTensor(frameLengthTensorInterface.Get());
                 frameLength = onnxruntime::narrow<uint32_t>(OperatorHelper::ReadScalarTensorCastToInt64(frameLengthTensor));
             }
@@ -110,7 +110,7 @@ struct STFTShapeInferrer : public WRL::Base<IMLOperatorShapeInferrer>
 
             std::array<uint32_t, 4> outputDims = { batchSize, frameCount, uniqueBins, 2 };
 
-            ORT_THROW_IF_FAILED(context->SetOutputTensorShape(0, rank, outputDims.data()));
+            ORT_THROW_IF_FAILED(context->SetOutputTensorShape(0, onnxruntime::narrow<uint32_t>(outputDims.size()), outputDims.data()));
         }
         catch (...)
         {

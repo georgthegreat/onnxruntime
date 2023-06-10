@@ -1,0 +1,133 @@
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/attention_fusion.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/attention_fusion.cc	(working tree)
+@@ -105,7 +105,7 @@ static NodeArg& MergeQkvWeights(Graph& graph, int64_t hidden_size,
+   auto data_type = q_tensor->data_type();
+ 
+   ONNX_NAMESPACE::TensorProto initializer;
+-  initializer.set_name(TString{graph.GenerateNodeArgName(is_matmul ? "qkv_weights" : "qkv_bias")});
++  initializer.set_name(graph.GenerateNodeArgName(is_matmul ? "qkv_weights" : "qkv_bias"));
+   // Shape of weights for MatMul is (hidden_size, 3 * hidden_size)
+   // Shape of weights for Add bias is (3 * hidden_size)
+   if (is_matmul) {
+@@ -126,7 +126,7 @@ static NodeArg& MergeQkvWeights(Graph& graph, int64_t hidden_size,
+     } else {
+       MergeWeights<float>(q_weight, k_weight, v_weight, result, hidden_size);
+     }
+-    initializer.set_raw_data(TString{result.data(), gsl::narrow<size_t>(element_count) * sizeof(float)});
++    initializer.set_raw_data(result.data(), gsl::narrow<size_t>(element_count) * sizeof(float));
+   } else {  // data_type == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16
+     const MLFloat16* q_weight = q_initializer.data<MLFloat16>();
+     const MLFloat16* k_weight = k_initializer.data<MLFloat16>();
+@@ -138,7 +138,7 @@ static NodeArg& MergeQkvWeights(Graph& graph, int64_t hidden_size,
+     } else {
+       MergeWeights<MLFloat16>(q_weight, k_weight, v_weight, result, hidden_size);
+     }
+-    initializer.set_raw_data(TString{result.data(), gsl::narrow<size_t>(element_count) * sizeof(MLFloat16)});
++    initializer.set_raw_data(result.data(), gsl::narrow<size_t>(element_count) * sizeof(MLFloat16));
+   }
+ 
+   return graph_utils::AddInitializer(graph, initializer);
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/embed_layer_norm_fusion.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/embed_layer_norm_fusion.cc	(working tree)
+@@ -464,14 +464,14 @@ static NodeArg* ExtractEmbedding(Graph& graph,
+       return nullptr;
+     }
+ 
+-    initializer.set_raw_data(TString{data, gsl::narrow<size_t>(element_count) * sizeof(float)});
++    initializer.set_raw_data(data, gsl::narrow<size_t>(element_count) * sizeof(float));
+   } else {  // data_type == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16
+     const MLFloat16* data = old_initializer.data<MLFloat16>();
+     if (!CheckEmbeddingData(data, batch_size, element_count)) {
+       return nullptr;
+     }
+ 
+-    initializer.set_raw_data(TString{data, gsl::narrow<size_t>(element_count) * sizeof(MLFloat16)});
++    initializer.set_raw_data(data, gsl::narrow<size_t>(element_count) * sizeof(MLFloat16));
+   }
+ 
+   NodeArg& node_arg = graph_utils::AddInitializer(graph, initializer);
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/nchwc_transformer.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/nchwc_transformer.cc	(working tree)
+@@ -428,7 +428,7 @@ void NchwcTransformerImpl::TransformConv(Node& node) {
+ 
+     nchwc_conv_W_tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_FLOAT);
+     nchwc_conv_W_tensor_proto.set_name(TString{graph_.GenerateNodeArgName("reorder")});
+-    nchwc_conv_W_tensor_proto.set_raw_data(TString{reordered_filter.data(), reordered_filter.size() * sizeof(float)});
++    nchwc_conv_W_tensor_proto.set_raw_data(reordered_filter.data(), reordered_filter.size() * sizeof(float));
+ 
+     nchwc_conv_W_tensor_proto.add_dims(nchwc_output_channels);
+     nchwc_conv_W_tensor_proto.add_dims(filter_input_channels);
+@@ -458,7 +458,7 @@ void NchwcTransformerImpl::TransformConv(Node& node) {
+ 
+       nchwc_conv_B_tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_FLOAT);
+       nchwc_conv_B_tensor_proto.set_name(TString{graph_.GenerateNodeArgName("reorder")});
+-      nchwc_conv_B_tensor_proto.set_raw_data(TString{aligned_bias.data(), gsl::narrow<size_t>(nchwc_output_channels) * sizeof(float)});
++      nchwc_conv_B_tensor_proto.set_raw_data(aligned_bias.data(), gsl::narrow<size_t>(nchwc_output_channels) * sizeof(float));
+ 
+       nchwc_conv_B_tensor_proto.add_dims(nchwc_output_channels);
+ 
+@@ -883,7 +883,7 @@ void NchwcTransformerImpl::TransformBatchNormalization(Node& node) {
+   ONNX_NAMESPACE::TensorProto nchwc_conv_W_tensor_proto;
+   nchwc_conv_W_tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_FLOAT);
+   nchwc_conv_W_tensor_proto.set_name(TString{graph_.GenerateNodeArgName("bn_scale")});
+-  nchwc_conv_W_tensor_proto.set_raw_data(TString{padded_buffer.data(), gsl::narrow<size_t>(nchwc_channels) * sizeof(float)});
++  nchwc_conv_W_tensor_proto.set_raw_data(padded_buffer.data(), gsl::narrow<size_t>(nchwc_channels) * sizeof(float));
+   nchwc_conv_W_tensor_proto.add_dims(nchwc_channels);
+   nchwc_conv_W_tensor_proto.add_dims(1);
+   nchwc_conv_W_tensor_proto.add_dims(1);
+@@ -896,7 +896,7 @@ void NchwcTransformerImpl::TransformBatchNormalization(Node& node) {
+   ONNX_NAMESPACE::TensorProto nchwc_conv_B_tensor_proto;
+   nchwc_conv_B_tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_FLOAT);
+   nchwc_conv_B_tensor_proto.set_name(TString{graph_.GenerateNodeArgName("bn_B")});
+-  nchwc_conv_B_tensor_proto.set_raw_data(TString{padded_buffer.data(), gsl::narrow<size_t>(nchwc_channels) * sizeof(float)});
++  nchwc_conv_B_tensor_proto.set_raw_data(padded_buffer.data(), gsl::narrow<size_t>(nchwc_channels) * sizeof(float));
+   nchwc_conv_B_tensor_proto.add_dims(nchwc_channels);
+ 
+   auto* nchwc_conv_B_arg = &graph_utils::AddInitializer(graph_, nchwc_conv_B_tensor_proto);
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/qdq_transformer/qdq_s8_to_u8.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/qdq_transformer/qdq_s8_to_u8.cc	(working tree)
+@@ -76,1 +76,1 @@ Status QDQS8ToU8Transformer::ApplyImpl(Graph& graph, bool& modified, int graph_l
+-  zp_tensor_proto_u8.set_raw_data(TString{&q_zp_value, sizeof(uint8_t)});
++  zp_tensor_proto_u8.set_raw_data(&q_zp_value, sizeof(uint8_t));
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/qdq_transformer/selectors_actions/qdq_actions.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/qdq_transformer/selectors_actions/qdq_actions.cc	(working tree)
+@@ -102,7 +102,7 @@ struct SetOptionalZeroPoint {
+     ONNX_NAMESPACE::TensorProto tensor_proto;
+     tensor_proto.set_name(TString{name});
+     tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_INT8);
+-    tensor_proto.set_raw_data(TString{a.data(), sizeof(int8_t)});
++    tensor_proto.set_raw_data(a.data(), sizeof(int8_t));
+ 
+     return tensor_proto;
+   };
+@@ -115,7 +115,7 @@ struct SetOptionalZeroPoint {
+     ONNX_NAMESPACE::TensorProto tensor_proto;
+     tensor_proto.set_name(TString{name});
+     tensor_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_UINT8);
+-    tensor_proto.set_raw_data(TString{a.data(), sizeof(uint8_t)});
++    tensor_proto.set_raw_data(a.data(), sizeof(uint8_t));
+ 
+     return tensor_proto;
+   };
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/reshape_fusion.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/reshape_fusion.cc	(working tree)
+@@ -413,7 +413,7 @@ bool ReshapeFusion::Fuse_Subgraph(Node& reshape, Graph& graph, const logging::Lo
+   shape_initializer_proto.set_name(TString{shape_def->Name()});
+   shape_initializer_proto.add_dims(static_cast<int64_t>(shape_value.size()));
+   shape_initializer_proto.set_data_type(ONNX_NAMESPACE::TensorProto_DataType_INT64);
+-  shape_initializer_proto.set_raw_data(TString{shape_value.data(), shape_value.size() * sizeof(int64_t)});
++  shape_initializer_proto.set_raw_data(shape_value.data(), shape_value.size() * sizeof(int64_t));
+   auto& new_node_arg = graph_utils::AddInitializer(graph, shape_initializer_proto);
+ 
+   // Safely remove concat parent nodes which have only one output
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/transpose_optimizer/optimizer_api_impl.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/transpose_optimizer/optimizer_api_impl.cc	(working tree)
+@@ -721,7 +721,7 @@ std::string_view ApiGraph::AddInitializer(api::DataType dtype, const std::vector
+   ONNX_NAMESPACE::TensorProto tensor_proto;
+   tensor_proto.set_data_type(gsl::narrow_cast<int32_t>(dtype));
+   tensor_proto.set_name(TString{name});
+-  tensor_proto.set_raw_data(TString{data.data(), data.size()});
++  tensor_proto.set_raw_data(data.data(), data.size());
+   for (int64_t dim : shape) {
+     tensor_proto.add_dims(dim);
+   }

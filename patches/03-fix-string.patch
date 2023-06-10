@@ -1,0 +1,104 @@
+--- contrib/libs/onnx_runtime/include/onnxruntime/core/graph/graph.h	(index)
++++ contrib/libs/onnx_runtime/include/onnxruntime/core/graph/graph.h	(working tree)
+@@ -1501,7 +1501,7 @@ class Graph {
+   // Clear all unused initializers and NodeArgs
+   void CleanUnusedInitializersAndNodeArgs(const std::unordered_set<std::string>* initializer_names_to_preserve = nullptr);
+ 
+-  std::vector<NodeArg*> CreateNodeArgs(const google::protobuf::RepeatedPtrField<std::string>& names,
++  std::vector<NodeArg*> CreateNodeArgs(const google::protobuf::RepeatedPtrField<TString>& names,
+                                        const ArgNameToTypeMap& name_to_type_map);
+ 
+   void ToGraphProtoInternal(ONNX_NAMESPACE::GraphProto& graph_proto) const;
+--- contrib/libs/onnx_runtime/onnxruntime/core/framework/kernel_registry.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/framework/kernel_registry.cc	(working tree)
+@@ -331,1 +331,1 @@ Status KernelRegistry::TryFindKernel(const std::string& op_name, const std::stri
+-        if (iter == kci_constraints.end() || find(iter->second.begin(), iter->second.end(), constraint.second) == iter->second.end()) {
++        if (iter == kci_constraints.end() || std::find(iter->second.begin(), iter->second.end(), constraint.second) == iter->second.end()) {
+--- contrib/libs/onnx_runtime/onnxruntime/core/framework/tensorprotoutils.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/framework/tensorprotoutils.cc	(working tree)
+@@ -1157,7 +1157,7 @@ static void SparsifyGeneric(const void* dense_raw_data, size_t n_dense_elements,
+   if (!gathered_indices.empty()) {
+     auto& raw_data = *values.mutable_raw_data();
+     raw_data.resize(gathered_indices.size() * element_size);
+-    void* data_dest = raw_data.data();
++    void* data_dest = raw_data.begin();
+ 
+     int64_t dest_index = 0;
+     for (auto src_index : gathered_indices) {
+--- contrib/libs/onnx_runtime/onnxruntime/core/graph/function_utils.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/graph/function_utils.cc	(working tree)
+@@ -12,7 +12,6 @@
+ namespace onnxruntime {
+ namespace function_utils {
+ 
+-using string = std::string;
+ using namespace ONNX_NAMESPACE;
+ 
+ // Utilify function to get the imported version of domain from opset imports
+@@ -312,7 +311,7 @@ private:
+   }
+ 
+   template <bool isOutput>
+-  void bind(google::protobuf::RepeatedPtrField<string>& formals, const google::protobuf::RepeatedPtrField<string>& actuals) {
++  void bind(google::protobuf::RepeatedPtrField<TString>& formals, const google::protobuf::RepeatedPtrField<TString>& actuals) {
+     // Every formal parameter name FP should be replace by the corresponding actual parameter name AP.
+     // However, if AP is empty, it is a missing optional parameter. This does not make any difference
+     // for inputs. However, for outputs we use a unique dummy name to handle the case that it
+@@ -322,8 +321,8 @@ private:
+     auto& current_scope = rename_scopes.back();
+     int i = 0;
+     for (; i < actuals.size(); ++i) {
+-      std::string& formal = *formals.Mutable(i);
+-      std::string rename_as = actuals.Get(i);
++      TString& formal = *formals.Mutable(i);
++      TString rename_as = actuals.Get(i);
+       if constexpr (isOutput)
+         if (rename_as.empty())
+           rename_as = prefix + formal;
+@@ -332,8 +331,8 @@ private:
+         formal = rename_as;
+     }
+     for (; i < formals.size(); ++i) {
+-      std::string& formal = *formals.Mutable(i);
+-      std::string rename_as = isOutput ? prefix + formal : std::string("");
++      TString& formal = *formals.Mutable(i);
++      TString rename_as = isOutput ? prefix + formal : TString{};
+       current_scope[formal] = rename_as;
+       if (!rename_as.empty())
+         formal = rename_as;
+--- contrib/libs/onnx_runtime/onnxruntime/core/graph/graph.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/graph/graph.cc	(working tree)
+@@ -2983,7 +2983,7 @@ void Graph::AddValueInfo(const NodeArg* new_value_info) {
+   value_info_.insert(new_value_info);
+ }
+ 
+-std::vector<NodeArg*> Graph::CreateNodeArgs(const google::protobuf::RepeatedPtrField<std::string>& names,
++std::vector<NodeArg*> Graph::CreateNodeArgs(const google::protobuf::RepeatedPtrField<TString>& names,
+                                             const ArgNameToTypeMap& name_to_type_map) {
+   const auto name_to_type_map_end = name_to_type_map.end();
+   std::vector<NodeArg*> results;
+--- contrib/libs/onnx_runtime/onnxruntime/core/graph/graph_flatbuffers_utils.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/graph/graph_flatbuffers_utils.cc	(working tree)
+@@ -53,7 +53,7 @@ Status SaveInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+   tb.add_dims(dims);
+   tb.add_data_type(static_cast<fbs::TensorDataType>(src_type));
+   if (has_string_data)
+-    tb.add_string_data(TString{string_data});
++    tb.add_string_data(string_data);
+   else
+     tb.add_raw_data(raw_data);
+   fbs_tensor = tb.Finish();
+--- contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(working tree)
+@@ -423,9 +423,9 @@ struct ProviderHostImpl : ProviderHost {
+   std::unique_ptr<ONNX_NAMESPACE::ModelProto> ModelProto__construct() override { return std::make_unique<ONNX_NAMESPACE::ModelProto>(); }
+   void ModelProto__operator_delete(ONNX_NAMESPACE::ModelProto* p) override { delete p; }
+ 
+-  bool ModelProto__SerializeToString(const ONNX_NAMESPACE::ModelProto* p, std::string& string) override { return p->SerializeToString(&string); }
++  bool ModelProto__SerializeToString(const ONNX_NAMESPACE::ModelProto* p, std::string& string) override { TString tstring; bool result = p->SerializeToString(&tstring); string = tstring.ConstRef(); return result; }
+   bool ModelProto__SerializeToOstream(const ONNX_NAMESPACE::ModelProto* p, std::ostream& output) override { return p->SerializeToOstream(&output); }
+-  bool ModelProto__ParseFromString(ONNX_NAMESPACE::ModelProto* p, const std::string& data) override { return p->ParseFromString(data); }
++  bool ModelProto__ParseFromString(ONNX_NAMESPACE::ModelProto* p, const std::string& data) override { return p->ParseFromString(TString{data}); }
+   std::string ModelProto__SerializeAsString(const ONNX_NAMESPACE::ModelProto* p) override { return p->SerializeAsString(); }
+ 
+   const ONNX_NAMESPACE::GraphProto& ModelProto__graph(const ONNX_NAMESPACE::ModelProto* p) override { return p->graph(); }

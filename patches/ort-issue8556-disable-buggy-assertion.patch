@@ -1,0 +1,19 @@
+As described in
+https://github.com/microsoft/onnxruntime/issues/8556
+onnx can not be used with onnx_runtime with enabled schema static registration.
+
+We solve this issue by disabling assertion and additional onnx ops registration in onnx_runtime.
+For detailed description, see
+https://st.yandex-team.ru/DTCC-1398
+
+--- contrib/libs/onnx_runtime/onnxruntime/core/session/environment.cc	(18e4691184fd54f61da23de25ade6a8658f055e5)
++++ contrib/libs/onnx_runtime/onnxruntime/core/session/environment.cc	(7c758c9282539d3e365bf1ca385cfd83d3af3b87)
+@@ -250,1 +250,1 @@ Status Environment::Initialize(std::unique_ptr<logging::LoggingManager> logging_
+-      RegisterOnnxOperatorSetSchema();
++      // RegisterOnnxOperatorSetSchema();
+@@ -250,1 +250,1 @@ Status Environment::Initialize(std::unique_ptr<logging::LoggingManager> logging_
+-      RegisterOnnxMLOperatorSetSchema();
++      // RegisterOnnxMLOperatorSetSchema();
+@@ -250,1 +250,1 @@ Status Environment::Initialize(std::unique_ptr<logging::LoggingManager> logging_
+-      RegisterOnnxTrainingOperatorSetSchema();
++      // RegisterOnnxTrainingOperatorSetSchema();

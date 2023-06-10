@@ -1,0 +1,45 @@
+--- contrib/libs/onnx_runtime/include/onnxruntime/core/common/span_utils.h    (index)
++++ contrib/libs/onnx_runtime/include/onnxruntime/core/common/span_utils.h    (working tree)
+@@ -80,7 +80,7 @@ template <class U, class T>
+ 
+ template <class T1, size_t Extent1, class T2, size_t Extent2>
+ [[nodiscard]] inline bool SpanEq(gsl::span<T1, Extent1> a, gsl::span<T2, Extent2> b) {
+-  static_assert(std::is_same_v<std::remove_const_t<T1>, std::remove_const_t<T2>>,
++  static_assert(std::is_same<std::remove_const_t<T1>, std::remove_const_t<T2>>::value,
+                 "T1 and T2 should be the same type except for const qualification");
+   return std::equal(a.begin(), a.end(), b.begin(), b.end());
+ }
+--- contrib/libs/onnx_runtime/include/onnxruntime/core/framework/float16.h    (index)
++++ contrib/libs/onnx_runtime/include/onnxruntime/core/framework/float16.h    (working tree)
+@@ -69,7 +69,7 @@ struct BFloat16 {
+       val = static_cast<uint16_t>((U32 + rounding_bias) >> 16);
+     }
+ #else
+-    if constexpr(endian::native == endian::little) {
++    if (endian::native == endian::little) {
+       std::memcpy(&val, reinterpret_cast<char*>(&v) + sizeof(uint16_t), sizeof(uint16_t));
+     }
+     else {
+--- contrib/libs/onnx_runtime/onnxruntime/contrib_ops/cuda/quantization/qordered_ops/qordered_qdq.cc    (index)
++++ contrib/libs/onnx_runtime/onnxruntime/contrib_ops/cuda/quantization/qordered_ops/qordered_qdq.cc    (working tree)
+@@ -70,7 +70,7 @@ Status CheckTensorOrder(const Tensor& input_tensor, cublasLtOrder_t input_order,
+   UpdateTileRequire(input_order, row_tile, col_tile);
+   UpdateTileRequire(output_order, row_tile, col_tile);
+   if (rows % row_tile != 0 || cols % col_tile != 0) {
+-    return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "Shape not meet clean tile requirement!", dims);
++    return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "Shape not meet clean tile requirement!");
+   }
+   return Status::OK();
+ }
+--- contrib/libs/onnx_runtime/onnxruntime/core/providers/cpu/tensor/upsamplebase.h    (index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/providers/cpu/tensor/upsamplebase.h    (working tree)
+@@ -210,7 +210,8 @@ class UpsampleBase {
+         {"not_smaller", AspectRatioPolicy::NOT_SMALLER},
+     };
+ 
+-    if (auto it = policy_map.find(policy); it != policy_map.end()) {
++    auto it = policy_map.find(policy); 
++    if (it != policy_map.end()) {
+       return it->second;
+     } else {
+       ORT_THROW("keep_aspect_ratio of [" + policy + "] is not supported!");

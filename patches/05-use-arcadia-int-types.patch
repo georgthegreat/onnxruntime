@@ -1,0 +1,71 @@
+--- contrib/libs/onnx_runtime/onnxruntime/core/framework/tensorprotoutils.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/framework/tensorprotoutils.cc	(working tree)
+@@ -898,7 +898,7 @@ static Status CopySparseData(size_t n_sparse_elements,
+                              gsl::span<const int64_t> dims,
+                              std::function<void(size_t from_idx, size_t to_idx)> copier) {
+   Status status = Status::OK();
+-  TensorShape indices_shape(indices.dims().data(), indices.dims().size());
++  TensorShape indices_shape((int64_t*)indices.dims().data(), indices.dims().size());
+   const auto elements = narrow<size_t>(indices_shape.Size());
+ 
+   std::vector<int64_t> indices_values;  // used for conversion of smaller size indices
+@@ -914,7 +914,7 @@ static Status CopySparseData(size_t n_sparse_elements,
+         indices_data = ReinterpretAsSpan<const int64_t>(gsl::make_span(unpack_buffer));
+       } else {
+         ORT_RETURN_IF_NOT(indices.int64_data_size() == static_cast<int64_t>(elements), "Sparse indices int64 data size does not match expected");
+-        indices_data = gsl::make_span(indices.int64_data().data(), elements);
++        indices_data = gsl::make_span((int64_t*)indices.int64_data().data(), elements);
+       }
+       break;
+     case ONNX_NAMESPACE::TensorProto_DataType_INT32: {
+@@ -1034,7 +1034,7 @@ common::Status SparseTensorProtoToDenseTensorProto(const ONNX_NAMESPACE::SparseT
+   }
+ 
+   const auto& indices = sparse.indices();
+-  auto dims = gsl::make_span<const int64_t>(dense.dims().data(), dense.dims().size());
++  auto dims = gsl::make_span<const int64_t>((int64_t*)dense.dims().data(), dense.dims().size());
+ 
+   if (type != TensorProto_DataType_STRING) {
+     auto ml_data = DataTypeImpl::TensorTypeFromONNXEnum(type)->GetElementType();
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/attention_fusion_helper.h	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/attention_fusion_helper.h	(working tree)
+@@ -154,7 +154,7 @@ bool MatchGemmSubgraph(Graph& graph,
+     return false;
+   }
+ 
+-  if (!optimizer_utils::IsInitializerWithExpectedValue(graph, *(concat_after_gather.InputDefs()[2]), bias_shape->dim(0).dim_value(), true)) {
++  if (!optimizer_utils::IsInitializerWithExpectedValue(graph, *(concat_after_gather.InputDefs()[2]), (int64_t)bias_shape->dim(0).dim_value(), true)) {
+     DEBUG_LOG("concat_after_gather input 2 does not have expected value");
+     return false;
+   }
+--- contrib/libs/onnx_runtime/onnxruntime/core/optimizer/nchwc_transformer.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/optimizer/nchwc_transformer.cc	(working tree)
+@@ -935,7 +935,7 @@ void NchwcTransformerImpl::TransformTransposeToNhwc(Node& node) {
+   }
+ 
+   // Test if this transposes from NCHW to NHWC layout order.
+-  const int64_t* perm_data = perm_attr->ints().data();
++  const int64_t* perm_data = (int64_t*)perm_attr->ints().data();
+   if (perm_data[0] != 0 || perm_data[1] != 2 || perm_data[2] != 3 || perm_data[3] != 1) {
+     return;
+   }
+@@ -1125,7 +1125,7 @@ void NchwcTransformerImpl::TrackTransposeFromNhwc(Node& node) {
+   }
+ 
+   // Test if this transposes from NHWC to NCHW layout order.
+-  const int64_t* perm_data = perm_attr->ints().data();
++  const int64_t* perm_data = (int64_t*)perm_attr->ints().data();
+   if (perm_data[0] != 0 || perm_data[1] != 3 || perm_data[2] != 1 || perm_data[3] != 2) {
+     return;
+   }
+--- contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(working tree)
+@@ -54,7 +54,7 @@
+ 
+ namespace ONNX_NAMESPACE {
+ // We use these names in the provider API because we don't have the protobuf definitions of the RepeatedField* types
+-using int64s = google::protobuf::RepeatedField<int64_t>;
++using int64s = google::protobuf::RepeatedField<google::protobuf::int64>;
+ using TensorProtos = google::protobuf::RepeatedPtrField<TensorProto>;
+ using TensorShapeProto_Dimensions = google::protobuf::RepeatedPtrField<TensorShapeProto_Dimension>;
+ using ValueInfoProtos = google::protobuf::RepeatedPtrField<ValueInfoProto>;

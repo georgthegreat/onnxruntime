@@ -1,0 +1,11 @@
+--- onnxruntime/core/providers/cpu/tensor/mean_variance_normalization.h	(index)
++++ onnxruntime/core/providers/cpu/tensor/mean_variance_normalization.h	(working tree)
+@@ -105,7 +105,7 @@ class MeanVarianceNormalization_1 final : public MeanVarianceNormalization_0<T> 
+     if (!info.GetAttrs("axes", axes).IsOK()) {
+       axes = {0, 2, 3};
+     }
+-    if (find(axes.begin(), axes.end(), 1) != axes.end()) {
++    if (std::find(axes.begin(), axes.end(), 1) != axes.end()) {
+       this->across_channels_ = true;
+     } else {
+       this->across_channels_ = false;

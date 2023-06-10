@@ -1,0 +1,66 @@
+From 9e7122a74397cdb6ec35c5e4fd3b286f9499b1ae Mon Sep 17 00:00:00 2001
+From: Yuriy Chernyshov <thegeorg@yandex-team.com>
+Date: Thu, 16 Feb 2023 14:30:15 +0300
+Subject: [PATCH] Improve compatibility with certain STL's
+
+We use customized libc++ which uses raw pointers as std::vector::iterators.
+
+As per [expr.pre.incr](https://eel.is/c++draft/expr.compound#expr.pre.incr), builtin `operator++` can only be applied to lvalue, while `std::vector::begin()` returns an rvalue.
+
+See [this](https://godbolt.org/z/d3a1aKTWP) godbolt snippet for the details.
+---
+ include/onnxruntime/core/common/exceptions.h       | 4 ++--
+ include/onnxruntime/core/framework/sparse_tensor.h | 4 ++--
+ include/onnxruntime/core/graph/graph_nodes.h       | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/include/onnxruntime/core/common/exceptions.h b/include/onnxruntime/core/common/exceptions.h
+index cbebc88cf4f..18c117f12ad 100644
+--- a/include/onnxruntime/core/common/exceptions.h
++++ b/include/onnxruntime/core/common/exceptions.h
+@@ -52,7 +52,7 @@ class OnnxRuntimeException : public std::exception {
+     if (!location.stacktrace.empty()) {
+       ss << "Stacktrace:\n";
+       // skip the first entry in the stacktrace as we have that information from location.ToString()
+-      std::copy(++location.stacktrace.begin(), location.stacktrace.end(), std::ostream_iterator<std::string>(ss, "\n"));
++      std::copy(std::next(location.stacktrace.begin()), location.stacktrace.end(), std::ostream_iterator<std::string>(ss, "\n"));
+     }
+ 
+     what_ = ss.str();
+@@ -68,4 +68,4 @@ class OnnxRuntimeException : public std::exception {
+   std::string what_;
+ };
+ 
+-}  // namespace onnxruntime
+\ No newline at end of file
++}  // namespace onnxruntime
+diff --git a/include/onnxruntime/core/framework/sparse_tensor.h b/include/onnxruntime/core/framework/sparse_tensor.h
+index 161c3912936..73410e32956 100644
+--- a/include/onnxruntime/core/framework/sparse_tensor.h
++++ b/include/onnxruntime/core/framework/sparse_tensor.h
+@@ -1,10 +1,10 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
+-#if !defined(DISABLE_SPARSE_TENSORS)
+-
+ #pragma once
+ 
++#if !defined(DISABLE_SPARSE_TENSORS)
++
+ #include "core/framework/data_types.h"
+ #include "core/framework/tensor_shape.h"
+ #include "core/framework/tensor.h"
+diff --git a/include/onnxruntime/core/graph/graph_nodes.h b/include/onnxruntime/core/graph/graph_nodes.h
+index aec603f7942..8a119e3302f 100644
+--- a/include/onnxruntime/core/graph/graph_nodes.h
++++ b/include/onnxruntime/core/graph/graph_nodes.h
+@@ -94,7 +94,7 @@ class ValidNodes {
+    public:
+     using iterator_category = std::input_iterator_tag;
+     using value_type = T;
+-    using difference_type = typename TIterator::difference_type;
++    using difference_type = typename std::iterator_traits<TIterator>::difference_type;
+     using pointer = T*;
+     using reference = T&;
+     using const_reference = const T&;

@@ -1,0 +1,32 @@
+From 2de15c5d503cf6e4d679a2b8fca7135adc9f5ae8 Mon Sep 17 00:00:00 2001
+From: Dmitri Smirnov <yuslepukhin@users.noreply.github.com>
+Date: Fri, 24 Mar 2023 13:52:17 -0700
+Subject: [PATCH] Re-work OrtApi struct to satisfy C++20 compilers (#15183)
+
+### Description
+<!-- Describe your changes. -->
+Remove `deletion` of copy functions from `OrtApi` as its initialization
+no longer compiles in C++20.
+Introduce a non-copyable member to implicitly delete copy ctor.
+
+### Motivation and Context
+<!-- - Why is this change required? What problem does it solve?
+- If it fixes an open issue, please link to the issue here. -->
+Inspired by https://github.com/microsoft/onnxruntime/pull/14901
+
+Solution credits: @RyanUnderhill
+
+Cc: @georgthegreat
+---
+ include/onnxruntime/core/session/onnxruntime_c_api.h | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/include/onnxruntime/core/session/onnxruntime_c_api.h b/include/onnxruntime/core/session/onnxruntime_c_api.h
+index 2d94b8481ef..6832cc93af2 100644
+--- a/include/onnxruntime/core/session/onnxruntime_c_api.h
++++ b/include/onnxruntime/core/session/onnxruntime_c_api.h
+@@ -4086,4 +4086,0 @@ struct OrtApi {
+-
+-#ifdef __cplusplus
+-  OrtApi(const OrtApi&) = delete;  // Prevent users from accidentally copying the API structure, it should always be passed as a pointer
+-#endif

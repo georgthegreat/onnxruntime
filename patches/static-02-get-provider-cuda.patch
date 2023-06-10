@@ -1,0 +1,48 @@
+--- contrib/libs/onnx_runtime/onnxruntime/core/providers/cuda/cuda_provider_factory.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/providers/cuda/cuda_provider_factory.cc	(working tree)
+@@ -287,11 +287,15 @@ struct CUDA_Provider : Provider {
+ 
+ } g_provider;
+ 
+-}  // namespace onnxruntime
+-
+-extern "C" {
+-
+-ORT_API(onnxruntime::Provider*, GetProvider) {
+-  return &onnxruntime::g_provider;
+-}
++Provider& GetProvider_CUDA() {
++  std::once_flag flag;
++  std::call_once(
++    flag, 
++    []() {
++      g_provider.Initialize();
++    }
++  );
++  return g_provider;
+ }
++
++}  // namespace onnxruntime
+--- contrib/libs/onnx_runtime/onnxruntime/core/providers/cuda/cuda_provider_factory.h	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/providers/cuda/cuda_provider_factory.h	(working tree)
+@@ -62,4 +62,7 @@ struct ProviderInfo_CUDA {
+ #endif
+ };
+ 
++struct Provider;
++Provider& GetProvider_CUDA();
++
+ }  // namespace onnxruntime
+--- contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/session/provider_bridge_ort.cc	(working tree)
+@@ -1258,6 +1258,10 @@ ProviderInfo_OpenVINO* GetProviderInfo_OpenVINO() {
+   return reinterpret_cast<ProviderInfo_OpenVINO*>(s_library_openvino.Get().GetInfo());
+ }
+ 
++__attribute__((weak)) Provider& GetProvider_CUDA() {
++  ORT_THROW("CUDA Provider not available, can't get interface for it");
++}
++
+ ProviderInfo_CUDA* TryGetProviderInfo_CUDA() try {
+   return reinterpret_cast<ProviderInfo_CUDA*>(s_library_cuda.Get().GetInfo());
+ } catch (const std::exception& exception) {

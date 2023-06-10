@@ -1,0 +1,14 @@
+--- contrib/libs/onnx_runtime/onnxruntime/core/providers/shared_library/provider_wrappedtypes.h	(index)
++++ contrib/libs/onnx_runtime/onnxruntime/core/providers/shared_library/provider_wrappedtypes.h	(working tree)
+@@ -72,9 +72,9 @@ struct AttributeProto final {
+   const int64s& ints() const { return g_host->AttributeProto__ints(this); }
+   int64_t i() const { return g_host->AttributeProto__i(this); }
+   float f() const { return g_host->AttributeProto__f(this); }
+-  void set_s(TString{const ::std::string& value) { return g_host->AttributeProto__set_s(this, value}); }
++  void set_s(const ::std::string& value) { return g_host->AttributeProto__set_s(this, value); }
+   const ::std::string& s() const { return g_host->AttributeProto__s(this); }
+-  void set_name(TString{const ::std::string& value) { return g_host->AttributeProto__set_name(this, value}); }
++  void set_name(const ::std::string& value) { return g_host->AttributeProto__set_name(this, value); }
+   void set_type(AttributeProto_AttributeType value) { return g_host->AttributeProto__set_type(this, value); }
+   TensorProto* add_tensors() { return g_host->AttributeProto__add_tensors(this); }
+ 
